@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>豪華記帳日曆 Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #5AC8FA; --accent: #34C759; --bg: #F0F9F9; --card-bg: #ffffff; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 20px 20px 100px 20px; color: #2c3e50; }
+        .header-card { background: linear-gradient(135deg, var(--primary), var(--accent)); padding: 25px; border-radius: 25px; color: white; text-align: center; box-shadow: 0 10px 20px rgba(52,199,89,0.2); margin-bottom: 20px; }
+        .total-amount { font-size: 2.2rem; font-weight: 800; }
+        .glass-card { background: var(--card-bg); border-radius: 20px; padding: 18px; margin-bottom: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.03); }
+        h3 { font-size: 1rem; margin: 0 0 15px 0; color: #444; display: flex; justify-content: space-between; }
+        
+        /* 月曆樣式 */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+        .cal-day-head { font-size: 0.7rem; color: #999; padding-bottom: 5px; }
+        .cal-cell { aspect-ratio: 1; border-radius: 10px; background: #f8fcfc; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 0.8rem; border: 1px solid #f0f5f5; }
+        .cal-cell.today { border: 2px solid var(--primary); font-weight: bold; background: #fff; }
+        .cal-amt { font-size: 0.5rem; color: #ff3b30; margin-top: 2px; height: 12px; }
+
+        input, select, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 12px; border: none; font-size: 1rem; box-sizing: border-box; }
+        input, select { background: #f1f8f8; border: 1px solid transparent; }
+        input:focus { border-color: var(--primary); background: #fff; outline: none; }
+        .btn-main { background: var(--accent); color: white; font-weight: bold; cursor: pointer; }
+        .btn-sec { background: #E5E5EA; color: #333; font-size: 0.8rem; cursor: pointer; }
+        
+        .cat-tag-manage { display: inline-block; background: #e8f4f4; padding: 5px 10px; border-radius: 8px; margin: 3px; font-size: 0.8rem; }
+        .del-cat { color: red; margin-left: 5px; font-weight: bold; cursor: pointer; }
+        
+        .list-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f7f7; }
+        .icon-circle { width: 42px; height: 42px; background: #e8f4f4; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 1.2rem; }
+        .item-info { flex-grow: 1; }
+        .item-info .item-title { font-weight: 600; font-size: 0.95rem; }
+        .item-info .item-date { font-size: 0.75rem; color: #99abb0; }
+        .item-amt { font-weight: 700; color: #ff3b30; font-size: 0.9rem; }
+        
+        label { display: block; font-size: 0.85rem; color: #666; margin-bottom: 5px; margin-left: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="header-card">
+    <span id="cycleLabel">本期支出</span>
+    <div class="total-amount">HKD $<span id="totalDisplay">0</span></div>
+</div>
+
+<div class="glass-card">
+    <h3 id="calMonthTitle">支出日曆</h3>
+    <div class="calendar-grid" id="calendarGrid">
+        <div class="cal-day-head">日</div><div class="cal-day-head">一</div><div class="cal-day-head">二</div><div class="cal-day-head">三</div><div class="cal-day-head">四</div><div class="cal-day-head">五</div><div class="cal-day-head">六</div>
+    </div>
+</div>
+
+<div class="glass-card">
+    <h3>📝 入數 (可選日期)</h3>
+    <label>日期</label>
+    <input type="date" id="dateInput">
+    
+    <label>項目 / 備註</label>
+    <input type="text" id="note" placeholder="例如：茶餐廳午餐">
+    
+    <label>金額 (HKD)</label>
+    <input type="number" id="amt" placeholder="0.00" inputmode="decimal">
+    
+    <label>分類</label>
+    <select id="catSelect"></select>
+    
+    <button class="btn-main" onclick="add()">儲存紀錄</button>
+</div>
+
+<div class="glass-card">
+    <h3>⚙️ 設定與管理</h3>
+    <div style="font-size: 0.9rem; margin-bottom: 15px;">
+        每月起始日：<input type="number" id="startDay" min="1" max="28" value="1" onchange="updateUI()" style="width:60px; display:inline; padding:5px; margin-bottom:0;"> 號
+    </div>
+    <div id="catList" style="margin-bottom:10px;"></div>
+    <div style="display: flex; gap: 5px;">
+        <input type="text" id="newCat" placeholder="新增分類" style="margin-bottom:0;">
+        <button class="btn-main" onclick="addCat()" style="width:80px; margin-bottom:0;">加入</button>
+    </div>
+    <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+    <button class="btn-sec" onclick="exportCSV()">📤 匯出 Excel (CSV)</button>
+    <button class="btn-sec" onclick="document.getElementById('importFile').click()">📥 匯入 Excel (CSV)</button>
+    <input type="file" id="importFile" accept=".csv" style="display:none" onchange="importCSV(event)">
+    <button class="btn-sec" onclick="clearAll()" style="color:red; margin-top:10px; background:#fff0f0;">⚠️ 清空所有數據</button>
+</div>
+
+<div class="glass-card">
+    <h3>🗓️ 最近消費明細</h3>
+    <div id="recordList"></div>
+</div>
+
+<script>
+    let records = JSON.parse(localStorage.getItem('myExp_V3_Date')) || [];
+    let categories = JSON.parse(localStorage.getItem('myCats_V3')) || ['🍱 食飯', '🚌 交通', '🛍️ 買嘢', '🎮 娛樂', '❓ 其他'];
+    
+    // 預設日期為今日
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('dateInput').value = todayStr;
+
+    function updateUI() {
+        const startDay = parseInt(document.getElementById('startDay').value) || 1;
+        localStorage.setItem('startDay', startDay);
+        
+        // 分類管理
+        const select = document.getElementById('catSelect');
+        const catListDiv = document.getElementById('catList');
+        select.innerHTML = '';
+        catListDiv.innerHTML = '<strong>分類：</strong><br>';
+        categories.forEach((c, i) => {
+            select.innerHTML += `<option value="${c}">${c}</option>`;
+            catListDiv.innerHTML += `<span class="cat-tag-manage">${c} <span class="del-cat" onclick="delCat(${i})">×</span></span>`;
+        });
+
+        const now = new Date();
+        let cycleStart = new Date(now.getFullYear(), now.getMonth(), startDay);
+        if (now.getDate() < startDay) cycleStart.setMonth(cycleStart.getMonth() - 1);
+        let cycleEnd = new Date(cycleStart); cycleEnd.setMonth(cycleEnd.getMonth() + 1);
+
+        document.getElementById('cycleLabel').innerText = `${cycleStart.getMonth()+1}/${cycleStart.getDate()} - ${cycleEnd.getMonth()+1}/${cycleEnd.getDate()} 支出`;
+
+        // 過濾本期
+        const thisCycle = records.filter(r => {
+            const d = new Date(r.date);
+            return d >= cycleStart && d < cycleEnd;
+        }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        let total = 0;
+        const list = document.getElementById('recordList');
+        list.innerHTML = '';
+        thisCycle.forEach(re => {
+            total += parseFloat(re.amount);
+            list.innerHTML += `
+                <div class="list-item">
+                    <div class="icon-circle">💰</div>
+                    <div class="item-info">
+                        <div class="item-title">${re.note || re.category}</div>
+                        <div class="item-date">${re.category} | ${new Date(re.date).toLocaleDateString()}</div>
+                    </div>
+                    <div class="item-amt">-HKD $${parseFloat(re.amount).toLocaleString()}</div>
+                </div>`;
+        });
+
+        document.getElementById('totalDisplay').innerText = total.toLocaleString();
+        renderCalendar(now.getFullYear(), now.getMonth());
+        localStorage.setItem('myExp_V3_Date', JSON.stringify(records));
+        localStorage.setItem('myCats_V3', JSON.stringify(categories));
+    }
+
+    function renderCalendar(year, month) {
+        document.getElementById('calMonthTitle').innerText = `${year}年${month+1}月 支出日曆`;
+        const grid = document.getElementById('calendarGrid');
+        while(grid.children.length > 7) grid.removeChild(grid.lastChild);
+        
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const today = new Date();
+
+        for(let i=0; i<firstDay; i++) grid.innerHTML += `<div></div>`;
+
+        for(let d=1; d<=daysInMonth; d++) {
+            const dayTotal = records.reduce((sum, r) => {
+                const rDate = new Date(r.date);
+                return (rDate.getFullYear()===year && rDate.getMonth()===month && rDate.getDate()===d) ? sum + parseFloat(r.amount) : sum;
+            }, 0);
+
+            const isToday = (today.getFullYear()===year && today.getMonth()===month && today.getDate()===d);
+            grid.innerHTML += `
+                <div class="cal-cell ${isToday?'today':''}">
+                    <div>${d}</div>
+                    <div class="cal-amt">${dayTotal > 0 ? '-$'+Math.round(dayTotal) : ''}</div>
+                </div>`;
+        }
+    }
+
+    function add() {
+        const dVal = document.getElementById('dateInput').value;
+        const n = document.getElementById('note').value;
+        const a = document.getElementById('amt').value;
+        const c = document.getElementById('catSelect').value;
+        
+        if (!a) return alert('請輸入金額！');
+        
+        // 保持選擇的日期，但加上目前的時間，方便排序
+        let finalDate = new Date(dVal);
+        const now = new Date();
+        finalDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+
+        records.unshift({ note: n, amount: a, category: c, date: finalDate.toISOString() });
+        
+        // 重設輸入框 (日期保留在所選日期，方便連續輸入舊數)
+        document.getElementById('note').value = ''; 
+        document.getElementById('amt').value = '';
+        updateUI();
+    }
+
+    function addCat() {
+        const val = document.getElementById('newCat').value;
+        if(val) { categories.push(val); document.getElementById('newCat').value = ''; updateUI(); }
+    }
+    function delCat(i) { if(confirm('確定刪除分類？')) { categories.splice(i, 1); updateUI(); } }
+
+    function exportCSV() {
+        let csv = "\uFEFF日期,項目,類別,金額\n";
+        records.forEach(r => csv += `${new Date(r.date).toLocaleString()},${r.note},${r.category},${r.amount}\n`);
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        link.download = "my_expenses_hkd.csv"; link.click();
+    }
+
+    function importCSV(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(f) {
+            try {
+                const lines = f.target.result.split('\n');
+                for(let i=1; i<lines.length; i++) {
+                    const cols = lines[i].split(',');
+                    if(cols.length >= 4) {
+                        records.push({ date: new Date(cols[0]).toISOString(), note: cols[1], category: cols[2], amount: cols[3].replace('HKD $','').trim() });
+                    }
+                }
+                updateUI();
+                alert('匯入成功！');
+            } catch(err) { alert('匯入失敗，請檢查格式。'); }
+        };
+        reader.readAsText(file);
+    }
+
+    function clearAll() { if(confirm('⚠️ 警告：這將刪除所有記帳紀錄！確定嗎？')) { records = []; updateUI(); } }
+
+    const savedDay = localStorage.getItem('startDay') || 1;
+    document.getElementById('startDay').value = savedDay;
+    updateUI();
+</script>
+
+</body>
+</html>
