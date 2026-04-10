@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>專業記帳 HKD</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #5AC8FA;
+            --accent: #34C759;
+            --bg: #F0F9F9;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px 20px 100px 20px;
+        }
+
+        .header-card {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            padding: 30px 20px;
+            border-radius: 30px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(52, 199, 89, 0.2);
+            margin-bottom: 25px;
+        }
+
+        .header-card span { font-size: 0.9rem; opacity: 0.9; }
+        .total-amount { font-size: 2.5rem; font-weight: 800; margin-top: 5px; }
+
+        .glass-card {
+            background: var(--card-bg);
+            border-radius: 25px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.03);
+        }
+
+        h3 { font-size: 1rem; margin: 0 0 15px 0; color: #555; display: flex; justify-content: space-between; align-items: center; }
+
+        input, select {
+            background: #f1f8f8;
+            border: none;
+            padding: 14px;
+            border-radius: 15px;
+            width: 100%;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        .btn {
+            border: none;
+            padding: 15px;
+            border-radius: 15px;
+            width: 100%;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .btn-main { background: var(--accent); color: white; margin-top: 5px; }
+        .btn-export { background: #E5E5EA; color: #333; margin-top: 10px; font-size: 0.9rem; }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f7f7;
+        }
+
+        .icon-circle {
+            width: 40px; height: 40px;
+            background: #e8f4f4; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            margin-right: 12px; font-size: 1.2rem;
+        }
+
+        .item-info { flex-grow: 1; }
+        .item-info div { font-weight: 600; font-size: 0.95rem; }
+        .item-info span { font-size: 0.75rem; color: #99abb0; }
+        .item-amt { font-weight: 700; color: #ff3b30; font-size: 0.95rem; white-space: nowrap; }
+
+        .setting-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.9rem; }
+        .setting-row input { margin-bottom: 0; width: 60px; text-align: center; padding: 8px; }
+
+        .fab {
+            position: fixed; bottom: 30px; right: 25px;
+            width: 60px; height: 60px;
+            background: var(--primary); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 28px; border: none;
+            box-shadow: 0 8px 20px rgba(90, 200, 250, 0.4);
+        }
+
+        .chart-wrap { height: 200px; }
+    </style>
+</head>
+<body>
+
+<div class="header-card">
+    <span id="cycleLabel">本期支出</span>
+    <div class="total-amount">HKD $<span id="totalDisplay">0</span></div>
+</div>
+
+<div class="glass-card">
+    <h3>⚙️ 設定</h3>
+    <div class="setting-row">
+        <span>每月起始日：</span>
+        <input type="number" id="startDay" min="1" max="28" value="1" onchange="updateUI()">
+        <span>號</span>
+    </div>
+    <button class="btn btn-export" onclick="exportCSV()">📊 匯出資料 (Excel CSV)</button>
+</div>
+
+<div class="glass-card">
+    <div class="chart-wrap">
+        <canvas id="expenseChart"></canvas>
+    </div>
+</div>
+
+<div class="glass-card">
+    <h3>🌱 記帳</h3>
+    <input type="number" id="amt" placeholder="輸入金額" inputmode="decimal">
+    <select id="cat">
+        <option value="食飯">🍱 食飯</option>
+        <option value="交通">🚌 交通</option>
+        <option value="買嘢">🛍️ 買嘢</option>
+        <option value="娛樂">🎮 娛樂</option>
+        <option value="其他">❓ 其他</option>
+    </select>
+    <button class="btn btn-main" onclick="add()">儲存紀錄</button>
+</div>
+
+<div class="glass-card">
+    <h3>🗓️ 最近紀錄</h3>
+    <div id="recordList"></div>
+</div>
+
+<button class="fab" onclick="window.scrollTo({top: 400, behavior: 'smooth'})">+</button>
+
+<script>
+    let records = JSON.parse(localStorage.getItem('myExpensesV5')) || [];
+    let myChart = null;
+    const catIcons = { '食飯': '🍱', '交通': '🚌', '買嘢': '🛍️', '娛樂': '🎮', '其他': '❓' };
+
+    const savedDay = localStorage.getItem('startDay') || 1;
+    document.getElementById('startDay').value = savedDay;
+
+    function updateUI() {
+        const startDay = parseInt(document.getElementById('startDay').value) || 1;
+        localStorage.setItem('startDay', startDay);
+
+        const now = new Date();
+        let cycleStart = new Date(now.getFullYear(), now.getMonth(), startDay);
+        if (now.getDate() < startDay) {
+            cycleStart.setMonth(cycleStart.getMonth() - 1);
+        }
+        let cycleEnd = new Date(cycleStart);
+        cycleEnd.setMonth(cycleEnd.getMonth() + 1);
+
+        document.getElementById('cycleLabel').innerText = 
+            `${cycleStart.getMonth()+1}/${cycleStart.getDate()} - ${cycleEnd.getMonth()+1}/${cycleEnd.getDate()} 支出`;
+
+        const thisCycle = records.filter(r => {
+            const d = new Date(r.date);
+            return d >= cycleStart && d < cycleEnd;
+        });
+
+        let total = 0;
+        const stats = { '食飯': 0, '交通': 0, '買嘢': 0, '娛樂': 0, '其他': 0 };
+        const list = document.getElementById('recordList');
+        list.innerHTML = '';
+
+        thisCycle.forEach(re => {
+            total += parseFloat(re.amount);
+            stats[re.category] += parseFloat(re.amount);
+            
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML = `
+                <div class="icon-circle">${catIcons[re.category]}</div>
+                <div class="item-info">
+                    <div>${re.category}</div>
+                    <span>${new Date(re.date).toLocaleString()}</span>
+                </div>
+                <div class="item-amt">-HKD $${parseFloat(re.amount).toLocaleString()}</div>
+            `;
+            list.appendChild(div);
+        });
+
+        document.getElementById('totalDisplay').innerText = total.toLocaleString();
+        drawChart(stats);
+        localStorage.setItem('myExpensesV5', JSON.stringify(records));
+    }
+
+    function drawChart(stats) {
+        const ctx = document.getElementById('expenseChart').getContext('2d');
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(stats),
+                datasets: [{
+                    data: Object.values(stats),
+                    backgroundColor: ['#5AC8FA', '#34C759', '#FFCC00', '#FF3B30', '#AF52DE'],
+                    borderWidth: 0
+                }]
+            },
+            options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    function add() {
+        const a = document.getElementById('amt').value;
+        const c = document.getElementById('cat').value;
+        if (!a) return;
+        records.unshift({ amount: a, category: c, date: new Date().toISOString() });
+        document.getElementById('amt').value = '';
+        updateUI();
+    }
+
+    function exportCSV() {
+        if (records.length === 0) return alert('仲未有紀錄喎！');
+        let csvContent = "\uFEFF日期,類別,金額\n";
+        records.forEach(r => {
+            const date = new Date(r.date).toLocaleString();
+            csvContent += `${date},${r.category},HKD $${r.amount}\n`;
+        });
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "my_expenses_hkd.csv");
+        link.click();
+    }
+
+    updateUI();
+</script>
+
+</body>
+</html>
