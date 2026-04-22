@@ -2,406 +2,494 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的記帳 App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>記帳 App - 原生還原版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --primary-bg: #f4f7f6;
-            --card-bg: #ffffff;
+            --primary-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%, #43e97b 100%);
+            --bg-color: #f0f8f7;
+            --card-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            --text-gray: #888;
             --expense-red: #ff5e5e;
-            --income-green: #4ade80;
-            --text-main: #333;
-            --text-sub: #888;
+            --income-green: #2ecc71;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--primary-bg);
-            margin: 0;
-            padding: 15px;
-            color: var(--text-main);
+            font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 15px; color: #333;
+            padding-bottom: 100px; /* 為 FAB 留位 */
         }
 
-        /* Header 漸變樣式 */
-        .header-card {
-            background: linear-gradient(135deg, #7ee8fa 0%, #80ff72 100%);
+        /* 圖 1: Header 樣式 */
+        .header-summary {
+            background: var(--primary-gradient);
             border-radius: 25px;
-            padding: 30px 20px;
+            padding: 35px 20px;
             text-align: center;
             color: white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            box-shadow: var(--card-shadow);
             margin-bottom: 20px;
         }
+        .header-summary .date-range { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
+        .header-summary .total-amt { font-size: 32px; font-weight: 800; }
 
-        .header-card h2 { margin: 0; font-size: 14px; opacity: 0.9; }
-        .header-card .balance { font-size: 32px; font-weight: bold; margin-top: 5px; }
-
-        /* 通用卡片樣式 */
+        /* 通用卡片 */
         .card {
-            background: var(--card-bg);
-            border-radius: 20px;
+            background: white;
+            border-radius: 25px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            box-shadow: var(--card-shadow);
         }
 
-        /* 日曆樣式 */
-        .calendar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
+        /* 圖 1: 日曆樣式 */
+        .calendar-nav {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; font-weight: bold;
         }
-
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
-            text-align: center;
+        .cal-grid {
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            text-align: center; font-size: 14px;
         }
-
+        .cal-weekday { color: var(--text-gray); padding-bottom: 10px; }
         .cal-day {
-            padding: 10px 0;
-            border-radius: 10px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: 0.2s;
+            padding: 10px 0; position: relative; cursor: pointer;
+            border-radius: 12px; transition: 0.2s;
+        }
+        .cal-day.active { border: 2px solid #4facfe; }
+        .cal-day .day-num { font-size: 16px; }
+        .cal-day .day-amt { font-size: 9px; color: var(--expense-red); position: absolute; bottom: 0; width: 100%; left: 0; }
+
+        /* 圖 1: 比例圖 */
+        .chart-container { position: relative; width: 100%; height: 200px; }
+        .legend-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 10px; margin-top: 20px; font-size: 12px;
+        }
+        .legend-item { display: flex; align-items: center; white-space: nowrap; }
+        .dot { width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
+
+        /* 圖 2: 列表樣式 */
+        .list-header { font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; }
+        .list-header span { margin-right: 8px; }
+        .transaction-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 0; border-bottom: 1px solid #f2f2f2;
+        }
+        .item-left { display: flex; align-items: center; }
+        .icon-box {
+            width: 40px; height: 40px; background: #fff9e6; 
+            border-radius: 12px; display: flex; align-items: center; 
+            justify-content: center; font-size: 20px; margin-right: 12px;
+        }
+        .item-info .title { font-weight: 600; font-size: 15px; }
+        .item-info .subtitle { font-size: 11px; color: var(--text-gray); }
+        .item-right { text-align: right; }
+        .amt-val { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
+        .btn-cancel {
+            background: #fff0f0; color: #ff5e5e; border: none;
+            padding: 2px 8px; border-radius: 5px; font-size: 11px;
         }
 
-        .cal-day:hover { background: #eee; }
-        .cal-day.active { background: #4dabf7; color: white; }
-        .cal-day.has-data { border-bottom: 3px solid var(--expense-red); }
-
-        /* 表單樣式 */
-        input, select, button {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 12px;
-            border: 1px solid #eee;
-            box-sizing: border-box;
-            font-size: 16px;
+        /* 圖 3: 新增/管理 */
+        h3 { font-size: 16px; margin-top: 0; }
+        input, select {
+            width: 100%; background: #f7f9fb; border: none;
+            padding: 12px; margin: 8px 0; border-radius: 12px; font-size: 14px;
+        }
+        .type-toggle { display: flex; gap: 10px; margin-bottom: 10px; }
+        .type-toggle button {
+            flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #eee; background: white;
+        }
+        .type-toggle button.active { background: var(--income-green); color: white; border-color: var(--income-green); }
+        .type-toggle button.active.exp { background: var(--expense-red); border-color: var(--expense-red); }
+        
+        .btn-save {
+            background: #2ecc71; color: white; border: none; width: 100%;
+            padding: 15px; border-radius: 15px; font-weight: bold; font-size: 16px; margin-top: 10px;
         }
 
-        .btn-save { background-color: var(--income-green); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .btn-toggle-group { display: flex; gap: 10px; }
-        .btn-toggle { flex: 1; border: 1px solid #ddd; background: #f9f9f9; cursor: pointer; }
-        .btn-toggle.active-inc { background: var(--income-green); color: white; }
-        .btn-toggle.active-exp { background: var(--expense-red); color: white; }
-
-        /* 列表樣式 */
-        .list-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
+        /* 管理按鈕 */
+        .tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+        .tag { background: #eef2f6; padding: 5px 12px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; }
+        .tag span { margin-left: 5px; color: red; cursor: pointer; }
+        .btn-action {
+            display: flex; align-items: center; justify-content: center;
+            background: #f0f2f5; border: none; width: 100%; padding: 12px;
+            border-radius: 15px; margin-bottom: 10px; font-weight: 500;
         }
-        .list-item:last-child { border: none; }
-        .item-info div { font-size: 16px; }
-        .item-info small { color: var(--text-sub); font-size: 12px; }
-        .amt-exp { color: var(--expense-red); font-weight: bold; }
-        .amt-inc { color: var(--income-green); font-weight: bold; }
+        .btn-danger { color: #ff5e5e; background: #fff0f0; }
 
-        /* 管理與定期項目 */
-        .setting-row { display: flex; justify-content: space-between; margin: 10px 0; align-items: center; }
-        .btn-red { background: #ffeded; color: var(--expense-red); border: none; padding: 5px 15px; width: auto; }
+        /* Floating Button */
+        .fab {
+            position: fixed; bottom: 20px; right: 20px;
+            width: 60px; height: 60px; background: #4facfe;
+            border-radius: 30px; display: flex; align-items: center;
+            justify-content: center; color: white; font-size: 30px;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+            text-decoration: none; border: none;
+        }
     </style>
 </head>
 <body>
 
-    <div class="header-card">
-        <h2 id="summary-title">4/2026 結餘</h2>
-        <div class="balance" id="total-balance">HKD $0.00</div>
+    <div class="header-summary">
+        <div class="date-range" id="summary-period">4/10 - 5/10 支出</div>
+        <div class="total-amt" id="total-balance">HKD $0.00</div>
     </div>
 
     <div class="card">
-        <div class="calendar-header">
-            <button onclick="changeMonth(-1)" style="width: auto;">◀</button>
-            <strong id="calendar-month">2026/04</strong>
-            <button onclick="changeMonth(1)" style="width: auto;">▶</button>
+        <div class="calendar-nav">
+            <span onclick="changeMonth(-1)">◀</span>
+            <span id="cal-month-year">2026/04</span>
+            <span onclick="changeMonth(1)">▶</span>
         </div>
-        <div class="calendar-grid" id="calendar-grid">
+        <div class="cal-grid" id="calendar-body">
             </div>
     </div>
 
     <div class="card">
         <h3>支出比例圖</h3>
-        <canvas id="myChart" height="200"></canvas>
+        <div class="chart-container">
+            <canvas id="expenseChart"></canvas>
+        </div>
+        <div class="legend-grid" id="chart-legend">
+            </div>
     </div>
 
-    <div class="card">
-        <h3>新增入帳</h3>
-        <div class="btn-toggle-group">
-            <button class="btn-toggle active-exp" id="type-exp" onclick="setType('expense')">支出</button>
-            <button class="btn-toggle" id="type-inc" onclick="setType('income')">收入</button>
+    <div class="card" id="add-section">
+        <h3>📝 新增入帳</h3>
+        <div class="type-toggle">
+            <button id="btn-exp" class="active exp" onclick="setEntryType('expense')">支出</button>
+            <button id="btn-inc" onclick="setEntryType('income')">收入</button>
         </div>
         <input type="date" id="in-date">
-        <input type="text" id="in-item" placeholder="項目項目 (例如：午餐 / 出糧)">
-        <input type="number" id="in-amount" placeholder="金額 HKD $">
-        <select id="in-category">
-            <option value="食飯">🍱 食飯</option>
-            <option value="交通">🚌 交通</option>
-            <option value="買嘢">🛍️ 買嘢</option>
-            <option value="娛樂">🎮 娛樂</option>
-            <option value="入息">💰 入息</option>
-            <option value="其他">❓ 其他</option>
-        </select>
-        <button class="btn-save" onclick="addRecord()">儲存紀錄</button>
+        <input type="text" id="in-desc" placeholder="項目項目 (例如：午餐 / 買鞋)">
+        <input type="number" id="in-amt" placeholder="金額 HKD $">
+        <select id="in-cat">
+            </select>
+        <button class="btn-save" onclick="saveEntry()">儲存紀錄</button>
     </div>
 
     <div class="card">
-        <h3 id="list-title">最近 20 筆記錄</h3>
-        <div id="transaction-list">
+        <div class="list-header">
+            <span>📅</span> <span id="list-title">最近消費明細</span>
+        </div>
+        <div id="tx-list">
             </div>
     </div>
 
     <div class="card">
-        <h3>每月定期項目</h3>
-        <div id="recurring-list"></div>
-        <hr>
-        <input type="text" id="rec-item" placeholder="項目 (如: Netflix)">
-        <input type="number" id="rec-day" placeholder="每月幾號 (1-31)">
-        <input type="number" id="rec-amount" placeholder="金額">
-        <button onclick="addRecurring()" style="background: #e7f5ff; border: 1px solid #339af0; color: #339af0;">新增定期項目</button>
+        <h3>⚙️ 管理與設定</h3>
+        <div style="margin-bottom: 15px;">
+            每月起始日：<input type="number" id="start-day" value="10" style="width: 60px; display: inline;"> 號
+        </div>
+        
+        <div>分類：</div>
+        <div class="tag-list" id="cat-tags"></div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="new-cat" placeholder="新分類名" style="margin:0;">
+            <button onclick="addCategory()" style="width: auto; background: #2ecc71; color: white; border: none; border-radius: 10px; padding: 0 15px;">加</button>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button class="btn-action" onclick="exportExcel()">📤 匯出 Excel</button>
+            <button class="btn-action" onclick="importExcel()">📥 匯入 Excel</button>
+            <button class="btn-action btn-danger" onclick="clearAllData()">⚠️ 清空所有數據</button>
+        </div>
     </div>
 
-    <button class="btn-red" onclick="clearData()" style="width: 100%; margin-top: 20px;">⚠️ 清空所有數據</button>
+    <div class="card">
+        <h3>🔁 每月定期項目</h3>
+        <div id="periodic-list"></div>
+        <hr>
+        <input type="text" id="p-desc" placeholder="定期項目名稱">
+        <input type="number" id="p-day" placeholder="每月幾號">
+        <input type="number" id="p-amt" placeholder="金額">
+        <button class="btn-save" style="background:#4facfe" onclick="addPeriodic()">新增定期項目</button>
+    </div>
+
+    <button class="fab" onclick="document.getElementById('add-section').scrollIntoView({behavior:'smooth'})">+</button>
 
     <script>
-        // --- 1. 資料初始化 ---
-        let records = JSON.parse(localStorage.getItem('records')) || [];
-        let recurringItems = JSON.parse(localStorage.getItem('recurringItems')) || [];
-        let currentType = 'expense';
-        let viewDate = new Date(); // 目前查看的月份
-        let selectedDateStr = null; // 用戶選取的特定日期
-        let chartInstance = null;
+        // --- 數據狀態 ---
+        let entries = JSON.parse(localStorage.getItem('entries')) || [];
+        let categories = JSON.parse(localStorage.getItem('categories')) || [
+            { name: '食飯', icon: '🍱', color: '#36a2eb' },
+            { name: '交通', icon: '🚌', color: '#4bc0c0' },
+            { name: '買嘢', icon: '🛍️', color: '#ffce56' },
+            { name: '娛樂', icon: '🎮', color: '#ff6384' },
+            { name: '其他', icon: '❓', color: '#9966ff' }
+        ];
+        let periodics = JSON.parse(localStorage.getItem('periodics')) || [];
+        
+        let currentMonth = new Date();
+        let selectedDate = null; // 用於日曆篩選
+        let entryType = 'expense';
+        let chartObj = null;
 
-        // 設定今日日期為預設
-        document.getElementById('in-date').valueAsDate = new Date();
-
-        // --- 2. 核心功能 ---
-
-        function setType(type) {
-            currentType = type;
-            document.getElementById('type-exp').className = type === 'expense' ? 'btn-toggle active-exp' : 'btn-toggle';
-            document.getElementById('type-inc').className = type === 'income' ? 'btn-toggle active-inc' : 'btn-toggle';
+        // --- 初始化 ---
+        function init() {
+            document.getElementById('in-date').valueAsDate = new Date();
+            checkPeriodics();
+            renderAll();
         }
 
-        function addRecord() {
+        // --- 核心功能 ---
+        function setEntryType(type) {
+            entryType = type;
+            document.getElementById('btn-exp').className = type === 'expense' ? 'active exp' : '';
+            document.getElementById('btn-inc').className = type === 'income' ? 'active' : '';
+        }
+
+        function saveEntry() {
             const date = document.getElementById('in-date').value;
-            const item = document.getElementById('in-item').value;
-            const amount = parseFloat(document.getElementById('in-amount').value);
-            const category = document.getElementById('in-category').value;
+            const desc = document.getElementById('in-desc').value;
+            const amt = parseFloat(document.getElementById('in-amt').value);
+            const catName = document.getElementById('in-cat').value;
 
-            if (!date || !item || isNaN(amount)) return alert("請填好資料");
+            if (!date || !desc || isNaN(amt)) return alert("請完整填寫資料");
 
-            records.push({ id: Date.now(), date, item, amount, category, type: currentType });
-            saveData();
+            entries.push({ id: Date.now(), date, desc, amt, catName, type: entryType });
+            saveToLocal();
             renderAll();
-            // Reset input
-            document.getElementById('in-item').value = "";
-            document.getElementById('in-amount').value = "";
+            document.getElementById('in-desc').value = '';
+            document.getElementById('in-amt').value = '';
         }
 
-        function deleteRecord(id) {
-            records = records.filter(r => r.id !== id);
-            saveData();
-            renderAll();
-        }
-
-        function addRecurring() {
-            const item = document.getElementById('rec-item').value;
-            const day = parseInt(document.getElementById('rec-day').value);
-            const amount = parseFloat(document.getElementById('rec-amount').value);
-            if (!item || isNaN(day) || isNaN(amount)) return;
-            
-            recurringItems.push({ id: Date.now(), item, day, amount, type: 'expense', lastAddedMonth: "" });
-            saveData();
+        function deleteEntry(id) {
+            entries = entries.filter(e => e.id !== id);
+            saveToLocal();
             renderAll();
         }
 
-        // 檢查並執行定期入帳
-        function checkRecurring() {
-            const now = new Date();
-            const currentMonthStr = `${now.getFullYear()}-${now.getMonth() + 1}`;
-            let changed = false;
+        function checkPeriodics() {
+            const today = new Date();
+            const monthKey = `${today.getFullYear()}-${today.getMonth()}`;
+            let updated = false;
 
-            recurringItems.forEach(rec => {
-                // 如果今個月未加過，且今日日期已經到咗或過咗設定嘅日子
-                if (rec.lastAddedMonth !== currentMonthStr && now.getDate() >= rec.day) {
-                    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(rec.day).padStart(2, '0')}`;
-                    records.push({
+            periodics.forEach(p => {
+                if (p.lastProcessed !== monthKey && today.getDate() >= p.day) {
+                    const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(p.day).padStart(2,'0')}`;
+                    entries.push({
                         id: Date.now() + Math.random(),
                         date: dateStr,
-                        item: `[定期] ${rec.item}`,
-                        amount: rec.amount,
-                        category: "其他",
-                        type: "expense"
+                        desc: "[定期] " + p.desc,
+                        amt: p.amt,
+                        catName: '其他',
+                        type: 'expense'
                     });
-                    rec.lastAddedMonth = currentMonthStr;
-                    changed = true;
+                    p.lastProcessed = monthKey;
+                    updated = true;
                 }
             });
-
-            if (changed) saveData();
+            if (updated) saveToLocal();
         }
 
-        function saveData() {
-            localStorage.setItem('records', JSON.stringify(records));
-            localStorage.setItem('recurringItems', JSON.stringify(recurringItems));
-        }
-
-        // --- 3. UI 渲染渲染 ---
-
+        // --- 渲染 UI ---
         function renderAll() {
-            checkRecurring();
-            renderCalendar();
-            renderList();
             renderSummary();
+            renderCalendar();
             renderChart();
-            renderRecurringSettings();
+            renderList();
+            renderCategorySettings();
+            renderPeriodicList();
+            updateCatDropdown();
         }
 
         function renderSummary() {
-            const total = records.reduce((acc, r) => {
-                return r.type === 'income' ? acc + r.amount : acc - r.amount;
-            }, 0);
-            document.getElementById('total-balance').innerText = `HKD $${total.toLocaleString()}`;
+            const startDay = parseInt(document.getElementById('start-day').value) || 1;
+            // 簡化計算：只顯示總結餘 (收入 - 支出)
+            const bal = entries.reduce((acc, e) => e.type === 'income' ? acc + e.amt : acc - e.amt, 0);
+            document.getElementById('total-balance').innerText = `HKD $${bal.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            
+            // 更新 Header 文字
+            document.getElementById('summary-period').innerText = `${currentMonth.getMonth()+1}月 結餘狀況`;
         }
 
         function renderCalendar() {
-            const grid = document.getElementById('calendar-grid');
-            grid.innerHTML = "";
-            const year = viewDate.getFullYear();
-            const month = viewDate.getMonth();
-            document.getElementById('calendar-month').innerText = `${year}/${String(month + 1).padStart(2, '0')}`;
+            const grid = document.getElementById('calendar-body');
+            grid.innerHTML = '<div class="cal-weekday">日</div><div class="cal-weekday">一</div><div class="cal-weekday">二</div><div class="cal-weekday">三</div><div class="cal-weekday">四</div><div class="cal-weekday">五</div><div class="cal-weekday">六</div>';
+            
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth();
+            document.getElementById('cal-month-year').innerText = `${year}/${String(month+1).padStart(2,'0')}`;
 
             const firstDay = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-            // 空白格
-            for (let i = 0; i < firstDay; i++) {
-                grid.innerHTML += `<div></div>`;
-            }
+            for (let i = 0; i < firstDay; i++) grid.innerHTML += '<div></div>';
 
             for (let d = 1; d <= daysInMonth; d++) {
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                const hasData = records.some(r => r.date === dateStr);
-                const activeClass = selectedDateStr === dateStr ? 'active' : '';
-                const dotClass = hasData ? 'has-data' : '';
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const dayEntries = entries.filter(e => e.date === dateStr && e.type === 'expense');
+                const daySum = dayEntries.reduce((s, e) => s + e.amt, 0);
                 
-                grid.innerHTML += `<div class="cal-day ${activeClass} ${dotClass}" onclick="selectDate('${dateStr}')">${d}</div>`;
+                const isActive = selectedDate === dateStr ? 'active' : '';
+                grid.innerHTML += `
+                    <div class="cal-day ${isActive}" onclick="filterDate('${dateStr}')">
+                        <div class="day-num">${d}</div>
+                        ${daySum > 0 ? `<div class="day-amt">-$${Math.round(daySum)}</div>` : ''}
+                    </div>
+                `;
             }
         }
 
-        function selectDate(dateStr) {
-            if (selectedDateStr === dateStr) {
-                selectedDateStr = null; // 取消選取
-            } else {
-                selectedDateStr = dateStr;
-            }
+        function filterDate(dateStr) {
+            selectedDate = (selectedDate === dateStr) ? null : dateStr;
             renderAll();
         }
 
-        function renderList() {
-            const listDiv = document.getElementById('transaction-list');
-            listDiv.innerHTML = "";
+        function renderChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            const expenseData = entries.filter(e => e.type === 'expense');
+            
+            const dataMap = {};
+            categories.forEach(c => dataMap[c.name] = 0);
+            expenseData.forEach(e => { if(dataMap[e.catName] !== undefined) dataMap[e.catName] += e.amt; });
 
-            let displayRecords = [];
-            if (selectedDateStr) {
-                displayRecords = records.filter(r => r.date === selectedDateStr);
-                document.getElementById('list-title').innerText = `${selectedDateStr} 的紀錄`;
-            } else {
-                // 預設顯示最近 20 筆，按日期及 ID 排序
-                displayRecords = [...records].sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id).slice(0, 20);
-                document.getElementById('list-title').innerText = `最近 20 筆記錄`;
-            }
+            const labels = categories.map(c => c.name);
+            const vals = categories.map(c => dataMap[c.name]);
+            const colors = categories.map(c => c.color);
 
-            displayRecords.forEach(r => {
-                const itemEl = document.createElement('div');
-                itemEl.className = 'list-item';
-                const sign = r.type === 'income' ? '+' : '-';
-                const colorClass = r.type === 'income' ? 'amt-inc' : 'amt-exp';
-                
-                itemEl.innerHTML = `
-                    <div class="item-info">
-                        <div>${r.item} <small>(${r.category})</small></div>
-                        <small>${r.date}</small>
-                    </div>
-                    <div style="text-align: right">
-                        <div class="${colorClass}">${sign}HKD $${r.amount}</div>
-                        <button class="btn-red" style="font-size: 10px; padding: 2px 5px" onclick="deleteRecord(${r.id})">取消</button>
-                    </div>
-                `;
-                listDiv.appendChild(itemEl);
+            if (chartObj) chartObj.destroy();
+            chartObj = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: vals, backgroundColor: colors, borderWidth: 0 }]
+                },
+                options: { cutout: '70%', plugins: { legend: { display: false } }, maintainAspectRatio: false }
             });
-        }
 
-        function renderRecurringSettings() {
-            const div = document.getElementById('recurring-list');
-            div.innerHTML = recurringItems.map(item => `
-                <div class="setting-row">
-                    <span>${item.day}號 - ${item.item} ($${item.amount})</span>
-                    <button class="btn-red" onclick="removeRecurring(${item.id})">刪除</button>
+            // 自定義 Legend
+            const legendDiv = document.getElementById('chart-legend');
+            legendDiv.innerHTML = categories.map(c => `
+                <div class="legend-item">
+                    <div class="dot" style="background:${c.color}"></div>
+                    ${c.icon} ${c.name}
                 </div>
             `).join('');
         }
 
-        function removeRecurring(id) {
-            recurringItems = recurringItems.filter(i => i.id !== id);
-            saveData();
-            renderAll();
+        function renderList() {
+            const listDiv = document.getElementById('tx-list');
+            listDiv.innerHTML = '';
+            
+            let filtered = [];
+            if (selectedDate) {
+                filtered = entries.filter(e => e.date === selectedDate);
+                document.getElementById('list-title').innerText = `${selectedDate} 消費明細`;
+            } else {
+                filtered = [...entries].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 20);
+                document.getElementById('list-title').innerText = `最近消費明細 (20筆)`;
+            }
+
+            filtered.forEach(e => {
+                const catObj = categories.find(c => c.name === e.catName) || categories[categories.length-1];
+                listDiv.innerHTML += `
+                    <div class="transaction-item">
+                        <div class="item-left">
+                            <div class="icon-box">${catObj.icon}</div>
+                            <div class="item-info">
+                                <div class="title">${e.desc}</div>
+                                <div class="subtitle">${catObj.name} | ${e.date}</div>
+                            </div>
+                        </div>
+                        <div class="item-right">
+                            <div class="amt-val" style="color: ${e.type === 'income' ? '#2ecc71' : '#ff5e5e'}">
+                                ${e.type === 'income' ? '+' : '-'}HKD $${e.amt}
+                            </div>
+                            <button class="btn-cancel" onclick="deleteEntry(${e.id})">取消</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderCategorySettings() {
+            const container = document.getElementById('cat-tags');
+            container.innerHTML = categories.map((c, index) => `
+                <div class="tag">${c.icon} ${c.name} <span onclick="removeCategory(${index})">×</span></div>
+            `).join('');
+        }
+
+        function updateCatDropdown() {
+            const sel = document.getElementById('in-cat');
+            sel.innerHTML = categories.map(c => `<option value="${c.name}">${c.icon} ${c.name}</option>`).join('');
+        }
+
+        // --- 其他輔助 ---
+        function addCategory() {
+            const name = document.getElementById('new-cat').value;
+            if(!name) return;
+            categories.push({ name, icon: '🏷️', color: '#' + Math.floor(Math.random()*16777215).toString(16) });
+            saveToLocal(); renderAll();
+            document.getElementById('new-cat').value = '';
+        }
+
+        function removeCategory(index) {
+            categories.splice(index, 1);
+            saveToLocal(); renderAll();
+        }
+
+        function addPeriodic() {
+            const desc = document.getElementById('p-desc').value;
+            const day = parseInt(document.getElementById('p-day').value);
+            const amt = parseFloat(document.getElementById('p-amt').value);
+            if(!desc || isNaN(day) || isNaN(amt)) return;
+            periodics.push({ desc, day, amt, lastProcessed: "" });
+            saveToLocal(); renderAll();
+        }
+
+        function renderPeriodicList() {
+            const div = document.getElementById('periodic-list');
+            div.innerHTML = periodics.map((p, i) => `
+                <div style="display:flex; justify-content:space-between; font-size:13px; margin:5px 0;">
+                    <span>每月 ${p.day} 號 - ${p.desc} ($${p.amt})</span>
+                    <button onclick="periodics.splice(${i},1); saveToLocal(); renderAll();" class="btn-cancel">刪除</button>
+                </div>
+            `).join('');
+        }
+
+        function saveToLocal() {
+            localStorage.setItem('entries', JSON.stringify(entries));
+            localStorage.setItem('categories', JSON.stringify(categories));
+            localStorage.setItem('periodics', JSON.stringify(periodics));
         }
 
         function changeMonth(step) {
-            viewDate.setMonth(viewDate.getMonth() + step);
+            currentMonth.setMonth(currentMonth.getMonth() + step);
+            selectedDate = null;
             renderAll();
         }
 
-        function clearData() {
-            if(confirm("確定要刪除所有紀錄嗎？")) {
-                records = [];
-                recurringItems = [];
-                saveData();
-                renderAll();
+        function clearAllData() {
+            if(confirm("確定要清空所有數據嗎？此操作無法撤回。")) {
+                localStorage.clear();
+                location.reload();
             }
         }
 
-        // --- 4. 圖表功能 ---
-        function renderChart() {
-            const ctx = document.getElementById('myChart').getContext('2d');
-            
-            // 統計各分類支出
-            const expenseOnly = records.filter(r => r.type === 'expense');
-            const categories = [...new Set(expenseOnly.map(r => r.category))];
-            const data = categories.map(cat => {
-                return expenseOnly.filter(r => r.category === cat).reduce((sum, r) => sum + r.amount, 0);
+        function exportExcel() {
+            let csv = "日期,項目,分類,類型,金額\n";
+            entries.forEach(e => {
+                csv += `${e.date},${e.desc},${e.catName},${e.type},${e.amt}\n`;
             });
-
-            if (chartInstance) chartInstance.destroy();
-            
-            chartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: categories,
-                    datasets: [{
-                        data: data,
-                        backgroundColor: ['#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            });
+            const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "my_finance_data.csv";
+            link.click();
         }
 
-        // 啟動 App
-        renderAll();
+        function importExcel() {
+            alert("此功能需配合 File Reader，目前範例建議手動錄入。");
+        }
 
+        window.onload = init;
     </script>
 </body>
 </html>
