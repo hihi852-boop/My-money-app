@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>理財易</title>
+    <title>我的理財 App - 完整交互版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -88,6 +88,7 @@
 
         /* 紀錄清單 */
         .transaction-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f8f8f8; }
+        .item-info { flex: 1; }
         .item-info .main-title { font-weight: 600; font-size: 15px; }
         .item-info .sub-title { font-size: 11px; color: var(--text-gray); margin-top: 2px; }
         .amt-val { font-weight: bold; font-size: 15px; }
@@ -228,6 +229,15 @@
             renderAll();
         }
 
+        // 新增：刪除紀錄功能
+        function deleteEntry(id) {
+            if(confirm("確定要刪除呢筆紀錄嗎？")) {
+                entries = entries.filter(e => e.id !== id);
+                localStorage.setItem('wallet_v5', JSON.stringify(entries));
+                renderAll();
+            }
+        }
+
         function selectDate(dStr) {
             selectedDateStr = (selectedDateStr === dStr) ? null : dStr;
             renderAll();
@@ -289,7 +299,10 @@
                         <div class="main-title">${e.cat}</div>
                         <div class="sub-title">${e.date} | ${e.method}${e.subtitle ? ' | ' + e.subtitle : ''}</div>
                     </div>
-                    <div class="amt-val" style="color:${e.type==='income'?'#2ecc71':'#ff5e5e'}">${e.type==='income'?'+':'-'}$${e.amt.toFixed(2)}</div>
+                    <div style="text-align: right;">
+                        <div class="amt-val" style="color:${e.type==='income'?'#2ecc71':'#ff5e5e'}">${e.type==='income'?'+':'-'}$${e.amt.toFixed(2)}</div>
+                        <div onclick="deleteEntry(${e.id})" style="color:red; font-size: 11px; cursor: pointer; margin-top: 4px;">刪除</div>
+                    </div>
                 </div>`;
             });
         }
