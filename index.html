@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>我的理財 App - 影像存檔版</title>
+    <title>我的理財 App - 完整交互版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         :root {
             --primary-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%, #43e97b 100%);
@@ -29,6 +28,7 @@
         .page { display: none; }
         .page.active { display: block; }
 
+        /* Header */
         .header-summary {
             background: var(--primary-gradient);
             border-radius: 25px;
@@ -38,7 +38,7 @@
             box-shadow: var(--card-shadow);
             margin-bottom: 15px;
         }
-        .total-amt { font-size: 30px; font-weight: 800; }
+        .total-amt { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
 
         .card {
             background: white;
@@ -46,65 +46,53 @@
             padding: 18px;
             margin-bottom: 15px;
             box-shadow: var(--card-shadow);
+            width: 100%;
         }
 
         /* 月曆樣式 */
         .calendar-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: bold; }
+        .btn-reset { font-size: 11px; background: #eef9ff; color: #4facfe; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+        
         .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 12px; }
-        .cal-day { padding: 10px 0; position: relative; border-radius: 12px; min-height: 50px; cursor: pointer; }
+        .cal-weekday { color: var(--text-gray); padding-bottom: 8px; }
+        .cal-day { 
+            padding: 10px 0; position: relative; border-radius: 12px; 
+            min-height: 50px; cursor: pointer; transition: background 0.2s;
+        }
+        .cal-day.today { color: #4facfe; font-weight: 800; }
         .cal-day.selected { background: #eef9ff; border: 1.5px solid #4facfe; }
-        .cal-day .day-amt { font-size: 8.5px; color: var(--expense-red); position: absolute; bottom: 3px; width: 100%; left: 0; }
+        .cal-day .day-amt { font-size: 8.5px; color: var(--expense-red); position: absolute; bottom: 3px; width: 100%; left: 0; font-weight: normal; }
 
-        /* 輸入框與 OCR */
+        /* 輸入框佈局修正 - 徹底解決出界 */
         .form-container { width: 100%; display: flex; flex-direction: column; gap: 8px; }
         .flex-row { display: flex; gap: 8px; width: 100%; }
-        .flex-row > * { flex: 1; min-width: 0; }
+        .flex-row > * { flex: 1; min-width: 0; } /* 關鍵：min-width 防止撐破 */
 
         input, select { 
-            width: 100%; background: #f7f9fb; border: 1px solid #eee; 
-            padding: 12px; border-radius: 12px; font-size: 15px; 
-        }
-
-        .ocr-btn {
-            background: #4facfe; color: white; border: none; padding: 12px;
-            border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-
-        /* 圖片預覽區域 */
-        #img-preview-container {
-            display: none; position: relative; width: 80px; height: 80px;
-            margin: 5px 0; border-radius: 10px; overflow: hidden; border: 1px solid #ddd;
-        }
-        #img-preview { width: 100%; height: 100%; object-fit: cover; }
-        .del-img-btn {
-            position: absolute; top: 0; right: 0; background: rgba(255,0,0,0.7);
-            color: white; border: none; padding: 2px 6px; font-size: 10px; cursor: pointer;
+            width: 100%; 
+            background: #f7f9fb; 
+            border: 1px solid #eee; 
+            padding: 12px; 
+            border-radius: 12px; 
+            font-size: 15px; 
+            outline: none;
+            display: block;
         }
 
         .type-toggle { display: flex; gap: 8px; margin-bottom: 5px; }
         .type-toggle button { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid #eee; background: white; font-weight: bold; cursor: pointer; }
-        .type-toggle button.active.exp { background: var(--expense-red); color: white; }
-        .type-toggle button.active.inc { background: var(--income-green); color: white; }
+        .type-toggle button.active.exp { background: var(--expense-red); color: white; border-color: var(--expense-red); }
+        .type-toggle button.active.inc { background: var(--income-green); color: white; border-color: var(--income-green); }
+        
+        .btn-save { background: #2ecc71; color: white; border: none; width: 100%; padding: 15px; border-radius: 15px; font-weight: bold; font-size: 16px; margin-top: 5px; box-shadow: 0 4px 10px rgba(46, 204, 113, 0.2); }
 
-        .btn-save { background: #2ecc71; color: white; border: none; width: 100%; padding: 15px; border-radius: 15px; font-weight: bold; font-size: 16px; margin-top: 5px; }
-
-        /* 紀錄清單與圖片查看 */
+        /* 紀錄清單 */
         .transaction-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f8f8f8; }
         .item-info .main-title { font-weight: 600; font-size: 15px; }
         .item-info .sub-title { font-size: 11px; color: var(--text-gray); margin-top: 2px; }
-        .btn-view-photo { 
-            background: #f0f2f5; border: none; padding: 4px 8px; border-radius: 6px; 
-            font-size: 12px; cursor: pointer; margin-left: 5px; 
-        }
+        .amt-val { font-weight: bold; font-size: 15px; }
 
-        /* 大圖彈窗 (Modal) */
-        #photo-modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center;
-        }
-        #modal-img { max-width: 90%; max-height: 80%; border-radius: 10px; }
-
+        /* 導航 */
         .nav-bar {
             position: fixed; bottom: 0; left: 0; right: 0; background: white;
             height: 70px; display: flex; justify-content: space-around; align-items: center;
@@ -112,80 +100,84 @@
         }
         .nav-item { text-align: center; color: var(--text-gray); font-size: 12px; flex: 1; cursor: pointer; }
         .nav-item.active { color: #4facfe; font-weight: bold; }
+
+        /* 排序設定 */
+        .drag-item { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 15px; border-radius: 12px; margin-bottom: 8px; cursor: grab; }
+        .chart-container { height: 180px; }
     </style>
 </head>
 <body>
 
-    <div id="photo-modal" onclick="this.style.display='none'">
-        <img id="modal-img" src="">
-        <p style="color:white; position:absolute; bottom:20px;">撳任何地方關閉</p>
-    </div>
-
     <div id="page-home" class="page active">
         <div class="header-summary">
-            <div id="summary-month" style="font-size: 14px; opacity: 0.9;">4月總計</div>
+            <div id="summary-month" style="font-size: 14px; opacity: 0.9; margin-bottom: 4px;">4月全月總計</div>
             <div id="total-balance" class="total-amt">HKD $0.00</div>
         </div>
 
         <div class="card">
             <div class="calendar-nav">
-                <span onclick="changeMonth(-1)" style="padding:5px 15px">◀</span>
-                <span id="cal-month-year">2026/04</span>
-                <span onclick="changeMonth(1)" style="padding:5px 15px">▶</span>
+                <span onclick="changeMonth(-1)" style="padding: 5px 15px;">◀</span>
+                <div>
+                    <span id="cal-month-year">2026/04</span>
+                    <button class="btn-reset" onclick="selectDate(null)">全部</button>
+                </div>
+                <span onclick="changeMonth(1)" style="padding: 5px 15px;">▶</span>
             </div>
             <div class="cal-grid" id="calendar-body"></div>
         </div>
 
         <div class="card">
-            <h3 style="margin-top:0; font-size:16px;">✍️ 快速記帳</h3>
-            
-            <button class="ocr-btn" onclick="document.getElementById('photo-input').click()">
-                📷 影相 / 掃描 (自動填數)
-            </button>
-            <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
-            
-            <div id="img-preview-container">
-                <img id="img-preview" src="">
-                <button class="del-img-btn" onclick="removePhoto()">×</button>
-            </div>
-            <div id="ocr-status" style="font-size:12px; color:#4facfe; display:none; margin:5px 0;">辨識中... ⏳</div>
-
+            <h3 style="margin-top:0; font-size: 16px;">✍️ 快速記帳</h3>
             <div class="form-container">
                 <div class="type-toggle">
                     <button id="btn-exp" class="active exp" onclick="setEntryType('expense')">支出</button>
                     <button id="btn-inc" onclick="setEntryType('income')">收入</button>
                 </div>
+                
                 <input type="date" id="in-date">
-                <input type="number" id="in-amt" step="0.01" placeholder="金額 $">
+                <input type="number" id="in-amt" step="0.01" placeholder="金額 HKD $">
+
                 <div class="flex-row">
                     <select id="in-cat"></select>
                     <select id="in-method"></select>
                 </div>
-                <input type="text" id="in-subtitle" placeholder="副標題 (選填)">
+
+                <input type="text" id="in-subtitle" placeholder="副標題 / 備註 (選填)">
                 <button class="btn-save" onclick="saveEntry()">儲存紀錄</button>
             </div>
         </div>
 
         <div class="card">
-            <h3 id="list-title" style="font-size:16px;">最近紀錄</h3>
+            <h3 style="font-size: 16px;">📊 支出比例</h3>
+            <div class="chart-container"><canvas id="expenseChart"></canvas></div>
+        </div>
+
+        <div class="card">
+            <h3 id="list-title" style="font-size: 16px;">最近紀錄</h3>
             <div id="tx-list"></div>
         </div>
     </div>
 
     <div id="page-settings" class="page">
         <div class="card">
-            <h3>🏷️ 分類排序</h3>
+            <h3>🏷️ 分類排序 (拖動排序)</h3>
             <div id="cat-list-container"></div>
             <input type="text" id="new-cat-input" placeholder="例如: 🍱 食飯">
-            <button class="btn-save" style="background:#4facfe" onclick="addItem('cat')">新增</button>
+            <button class="btn-save" style="background:#4facfe" onclick="addItem('cat')">新增分類</button>
         </div>
+
         <div class="card">
-            <h3>💳 支付方式</h3>
+            <h3>💳 支付方式排序</h3>
             <div id="method-list-container"></div>
-            <input type="text" id="new-method-input" placeholder="例如: 八達通">
-            <button class="btn-save" style="background:#4facfe" onclick="addItem('method')">新增</button>
+            <input type="text" id="new-method-input" placeholder="例如: 💳 信用卡">
+            <button class="btn-save" style="background:#4facfe" onclick="addItem('method')">新增支付方式</button>
         </div>
+
         <div class="card">
+            <h3>💾 資料管理</h3>
+            <button class="btn-save" style="background:#f0f2f5; color:#333;" onclick="exportCSV()">📤 匯出 CSV</button>
+            <button class="btn-save" style="background:#f0f2f5; color:#333;" onclick="document.getElementById('csv-import').click()">📥 匯入 CSV</button>
+            <input type="file" id="csv-import" style="display:none" accept=".csv" onchange="importCSV(event)">
             <button class="btn-save" style="background:#fff0f0; color:#ff5e5e;" onclick="clearAllData()">⚠️ 清空數據</button>
         </div>
     </div>
@@ -196,108 +188,16 @@
     </nav>
 
     <script>
-        let entries = JSON.parse(localStorage.getItem('wallet_v6')) || [];
-        let categories = JSON.parse(localStorage.getItem('cats_v6')) || ['🍱 食飯', '🚌 交通', '🛍️ 買嘢'];
-        let methods = JSON.parse(localStorage.getItem('methods_v6')) || ['現金', '八達通', '信用卡'];
-        let entryType = 'expense', currentMonth = new Date(), selectedDateStr = null, tempImgBase64 = null;
+        let entries = JSON.parse(localStorage.getItem('wallet_v5')) || [];
+        let categories = JSON.parse(localStorage.getItem('cats_v5')) || ['🍱 食飯', '🚌 交通', '🛍️ 買嘢'];
+        let methods = JSON.parse(localStorage.getItem('methods_v5')) || ['現金', '信用卡', '八達通'];
+        let entryType = 'expense', currentMonth = new Date(), selectedDateStr = null, chartObj = null;
 
         window.onload = () => {
             document.getElementById('in-date').valueAsDate = new Date();
             renderAll();
         };
 
-        // --- 處理圖片與 OCR ---
-        function handlePhotoUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    // 壓縮圖片 (縮放到 Max 500px)
-                    const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height, max = 500;
-                    if (width > height) { if (width > max) { height *= max / width; width = max; } }
-                    else { if (height > max) { width *= max / height; height = max; } }
-                    canvas.width = width; canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    tempImgBase64 = canvas.toDataURL('image/jpeg', 0.7); // 壓縮 70% 質素
-                    document.getElementById('img-preview').src = tempImgBase64;
-                    document.getElementById('img-preview-container').style.display = 'block';
-                    
-                    // 同步做 OCR
-                    runOCR(file);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        async function runOCR(file) {
-            const status = document.getElementById('ocr-status');
-            status.style.display = 'block';
-            status.innerText = 'AI 辨識金額中... ⏳';
-            try {
-                const worker = await Tesseract.createWorker('eng');
-                const ret = await worker.recognize(file);
-                await worker.terminate();
-                const prices = ret.data.text.match(/\d+[\.,]\d{1,2}/g);
-                if (prices) {
-                    const max = Math.max(...prices.map(p => parseFloat(p.replace(',', '.'))));
-                    document.getElementById('in-amt').value = max.toFixed(2);
-                    status.innerText = '辨識成功！✅';
-                } else { status.innerText = '搵唔到金額，請手動輸入'; }
-            } catch (e) { status.innerText = '辨識失敗'; }
-            setTimeout(() => { status.style.display = 'none'; }, 3000);
-        }
-
-        function removePhoto() {
-            tempImgBase64 = null;
-            document.getElementById('img-preview-container').style.display = 'none';
-            document.getElementById('photo-input').value = '';
-        }
-
-        function viewPhoto(data) {
-            document.getElementById('modal-img').src = data;
-            document.getElementById('photo-modal').style.display = 'flex';
-        }
-
-        // --- 核心邏輯 ---
-        function saveEntry() {
-            const date = document.getElementById('in-date').value;
-            const amt = parseFloat(document.getElementById('in-amt').value);
-            const cat = document.getElementById('in-cat').value, method = document.getElementById('in-method').value;
-            const subtitle = document.getElementById('in-subtitle').value.trim();
-            if(!date || isNaN(amt)) return alert("請輸入金額");
-
-            entries.push({ id: Date.now(), date, amt, cat, method, subtitle, type: entryType, img: tempImgBase64 });
-            localStorage.setItem('wallet_v6', JSON.stringify(entries));
-            
-            removePhoto();
-            document.getElementById('in-amt').value = '';
-            document.getElementById('in-subtitle').value = '';
-            renderAll();
-        }
-
-        function renderList() {
-            const div = document.getElementById('tx-list');
-            div.innerHTML = '';
-            let filtered = selectedDateStr ? entries.filter(e => e.date === selectedDateStr) : [...entries].sort((a,b) => b.id - a.id).slice(0, 15);
-            filtered.forEach(e => {
-                div.innerHTML += `<div class="transaction-item">
-                    <div class="item-info">
-                        <div class="main-title">${e.cat} ${e.img ? `<button class="btn-view-photo" onclick="viewPhoto('${e.img}')">🖼️ 相片</button>` : ''}</div>
-                        <div class="sub-title">${e.date} | ${e.method}${e.subtitle ? ' | ' + e.subtitle : ''}</div>
-                    </div>
-                    <div class="amt-val" style="color:${e.type==='income'?'#2ecc71':'#ff5e5e'}">${e.type==='inc'?'+':'-'}$${e.amt.toFixed(2)}</div>
-                </div>`;
-            });
-        }
-
-        // --- 其他輔助 (保持 Checkpoint v5 邏輯) ---
         function switchPage(p) {
             document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -306,11 +206,50 @@
             renderAll();
         }
 
+        function setEntryType(t) {
+            entryType = t;
+            document.getElementById('btn-exp').className = t === 'expense' ? 'active exp' : '';
+            document.getElementById('btn-inc').className = t === 'income' ? 'active inc' : '';
+        }
+
+        function saveEntry() {
+            const date = document.getElementById('in-date').value;
+            const amt = parseFloat(document.getElementById('in-amt').value);
+            const cat = document.getElementById('in-cat').value;
+            const method = document.getElementById('in-method').value;
+            const subtitle = document.getElementById('in-subtitle').value.trim();
+
+            if(!date || isNaN(amt)) return alert("請輸入完整金額！");
+
+            entries.push({ id: Date.now(), date, amt, cat, method, subtitle, type: entryType });
+            localStorage.setItem('wallet_v5', JSON.stringify(entries));
+            document.getElementById('in-amt').value = '';
+            document.getElementById('in-subtitle').value = '';
+            renderAll();
+        }
+
+        function selectDate(dStr) {
+            selectedDateStr = (selectedDateStr === dStr) ? null : dStr;
+            renderAll();
+        }
+
+        function renderAll() {
+            renderSummary();
+            renderCalendar();
+            renderList();
+            renderChart();
+            setupDraggable('cat-list-container', 'cats_v5', categories);
+            setupDraggable('method-list-container', 'methods_v5', methods);
+            document.getElementById('in-cat').innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            document.getElementById('in-method').innerHTML = methods.map(m => `<option value="${m}">${m}</option>`).join('');
+        }
+
         function renderSummary() {
             const month = currentMonth.getMonth() + 1;
-            document.getElementById('summary-month').innerText = `${month}月總結`;
+            document.getElementById('summary-month').innerText = `${month}月全月總計`;
             const bal = entries.reduce((acc, e) => {
-                if(new Date(e.date).getMonth() + 1 === month) return e.type === 'income' ? acc + e.amt : acc - e.amt;
+                const eMonth = new Date(e.date).getMonth() + 1;
+                if(eMonth === month) return e.type === 'income' ? acc + e.amt : acc - e.amt;
                 return acc;
             }, 0);
             document.getElementById('total-balance').innerText = `HKD ${bal >= 0 ? '+' : ''}${bal.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
@@ -318,28 +257,121 @@
 
         function renderCalendar() {
             const grid = document.getElementById('calendar-body');
-            grid.innerHTML = '<div style="color:#888">日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>';
+            grid.innerHTML = '<div class="cal-weekday">日</div><div class="cal-weekday">一</div><div class="cal-weekday">二</div><div class="cal-weekday">三</div><div class="cal-weekday">四</div><div class="cal-weekday">五</div><div class="cal-weekday">六</div>';
             const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
             document.getElementById('cal-month-year').innerText = `${year}/${String(month+1).padStart(2,'0')}`;
             const firstDay = new Date(year, month, 1).getDay(), days = new Date(year, month + 1, 0).getDate();
+            const today = new Date().toISOString().split('T')[0];
+
             for(let i=0; i<firstDay; i++) grid.appendChild(document.createElement('div'));
             for(let d=1; d<=days; d++) {
                 const dStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                 const dayExp = entries.filter(e => e.date === dStr && e.type === 'expense').reduce((s, e) => s + e.amt, 0);
                 const dayDiv = document.createElement('div');
-                dayDiv.className = `cal-day ${selectedDateStr === dStr ? 'selected' : ''}`;
+                dayDiv.className = `cal-day ${dStr === today ? 'today' : ''} ${selectedDateStr === dStr ? 'selected' : ''}`;
                 dayDiv.innerHTML = `<div>${d}</div>${dayExp > 0 ? `<div class="day-amt">-$${Math.round(dayExp)}</div>` : ''}`;
-                dayDiv.onclick = () => { selectedDateStr = (selectedDateStr === dStr ? null : dStr); renderAll(); };
+                dayDiv.onclick = () => selectDate(dStr);
                 grid.appendChild(dayDiv);
             }
         }
 
-        function setEntryType(t) { entryType = t; document.getElementById('btn-exp').className = t === 'expense' ? 'active exp' : ''; document.getElementById('btn-inc').className = t === 'income' ? 'active inc' : ''; }
-        function addItem(type) { const input = document.getElementById(`new-${type}-input`); if(!input.value) return; if(type === 'cat') categories.push(input.value); else methods.push(input.value); localStorage.setItem(`wallet_${type}s_v6`, JSON.stringify(type === 'cat' ? categories : methods)); input.value = ''; renderAll(); }
-        function renderAll() { renderSummary(); renderCalendar(); renderList(); updateDropdowns(); }
-        function updateDropdowns() { document.getElementById('in-cat').innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join(''); document.getElementById('in-method').innerHTML = methods.map(m => `<option value="${m}">${m}</option>`).join(''); }
-        function changeMonth(s) { currentMonth.setMonth(currentMonth.getMonth() + s); selectedDateStr = null; renderAll(); }
-        function clearAllData() { if(confirm("確定清空數據？")) { localStorage.clear(); location.reload(); } }
+        function renderList() {
+            const div = document.getElementById('tx-list');
+            div.innerHTML = '';
+            let filtered = selectedDateStr ? entries.filter(e => e.date === selectedDateStr) : [...entries].sort((a,b) => b.id - a.id).slice(0, 15);
+            document.getElementById('list-title').innerText = selectedDateStr ? `${selectedDateStr} 的紀錄` : "最近紀錄";
+            
+            if(filtered.length === 0) div.innerHTML = '<div style="text-align:center; padding:20px; color:#ccc;">暫無紀錄</div>';
+
+            filtered.forEach(e => {
+                div.innerHTML += `<div class="transaction-item">
+                    <div class="item-info">
+                        <div class="main-title">${e.cat}</div>
+                        <div class="sub-title">${e.date} | ${e.method}${e.subtitle ? ' | ' + e.subtitle : ''}</div>
+                    </div>
+                    <div class="amt-val" style="color:${e.type==='income'?'#2ecc71':'#ff5e5e'}">${e.type==='income'?'+':'-'}$${e.amt.toFixed(2)}</div>
+                </div>`;
+            });
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            const month = currentMonth.getMonth() + 1;
+            const expData = entries.filter(e => new Date(e.date).getMonth()+1 === month && e.type === 'expense');
+            const sums = categories.map(c => expData.filter(e => e.cat === c).reduce((s, e) => s + e.amt, 0));
+            if(chartObj) chartObj.destroy();
+            chartObj = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: categories, datasets: [{ data: sums, backgroundColor: ['#36a2eb', '#ff6384', '#ffce56', '#4bc0c0', '#9966ff', '#ffa94d'] }] },
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
+            });
+        }
+
+        // 拖拉排序邏輯
+        function setupDraggable(containerId, dataKey, list) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            list.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'drag-item';
+                el.draggable = true;
+                el.innerHTML = `<span>☰ ${item}</span><span style="color:red" onclick="deleteItem('${dataKey}', ${index})">×</span>`;
+                el.ondragstart = (e) => e.dataTransfer.setData('text/plain', index);
+                el.ondragover = (e) => e.preventDefault();
+                el.ondrop = (e) => {
+                    const fromIndex = e.dataTransfer.getData('text/plain');
+                    const movedItem = list.splice(fromIndex, 1)[0];
+                    list.splice(index, 0, movedItem);
+                    localStorage.setItem(dataKey, JSON.stringify(list));
+                    renderAll();
+                };
+                container.appendChild(el);
+            });
+        }
+
+        function addItem(type) {
+            const input = document.getElementById(`new-${type}-input`);
+            if(!input.value) return;
+            const list = (type === 'cat') ? categories : methods;
+            list.push(input.value);
+            localStorage.setItem((type === 'cat' ? 'cats_v5' : 'methods_v5'), JSON.stringify(list));
+            input.value = '';
+            renderAll();
+        }
+
+        function deleteItem(key, index) {
+            const list = key.includes('cats') ? categories : methods;
+            list.splice(index, 1);
+            localStorage.setItem(key, JSON.stringify(list));
+            renderAll();
+        }
+
+        function changeMonth(s) { currentMonth.setMonth(currentMonth.getMonth() + s); selectDate(null); }
+        function clearAllData() { if(confirm("確定清空？")) { localStorage.clear(); location.reload(); } }
+        function exportCSV() {
+            let csv = "\ufeff日期,分類,方式,副標題,金額,類型\n";
+            entries.forEach(e => csv += `${e.date},${e.cat},${e.method},"${e.subtitle || ''}",${e.amt},${e.type}\n`);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `my_money.csv`;
+            link.click();
+        }
+        function importCSV(ev) {
+            const file = ev.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const rows = e.target.result.split('\n').slice(1);
+                entries = rows.filter(r => r.trim()).map(r => {
+                    const c = r.split(',');
+                    return { id: Date.now()+Math.random(), date: c[0], cat: c[1], method: c[2], subtitle: c[3].replace(/"/g,''), amt: parseFloat(c[4]), type: c[5].trim() };
+                });
+                localStorage.setItem('wallet_v5', JSON.stringify(entries));
+                renderAll();
+                alert("匯入成功！");
+            };
+            reader.readAsText(file);
+        }
     </script>
 </body>
 </html>
